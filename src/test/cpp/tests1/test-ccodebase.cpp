@@ -385,7 +385,7 @@ TEST(CCodeBase, codeUtf7)
  */
 TEST(CCodeBase, codeUtf16Le)
 {
-	const auto eCodeType = CODE_UNICODE;
+	const auto eCodeType = CODE_UTF16LE;
 	auto pCodeBase = CCodeFactory::CreateCodeBase( eCodeType );
 
 	// 7bit ASCII範囲（等価変換）
@@ -433,7 +433,7 @@ TEST(CCodeBase, codeUtf16Le)
  */
 TEST(CCodeBase, codeUtf16Be)
 {
-	const auto eCodeType = CODE_UNICODEBE;
+	const auto eCodeType = CODE_UTF16BE;
 	auto pCodeBase = CCodeFactory::CreateCodeBase( eCodeType );
 
 	// 7bit ASCII範囲（等価変換）
@@ -481,7 +481,7 @@ TEST(CCodeBase, codeUtf16Be)
  */
 TEST(CCodeBase, codeUtf32Le)
 {
-	const auto eCodeType = (ECodeType)12000;
+	const auto eCodeType = CODE_UTF32LE;
 	auto pCodeBase = CCodeFactory::CreateCodeBase( eCodeType );
 
 	// 7bit ASCII範囲（等価変換）
@@ -529,7 +529,7 @@ TEST(CCodeBase, codeUtf32Le)
  */
 TEST(CCodeBase, codeUtf32Be)
 {
-	const auto eCodeType = (ECodeType)12001;
+	const auto eCodeType = CODE_UTF32BE;
 	auto pCodeBase = CCodeFactory::CreateCodeBase( eCodeType );
 
 	// 7bit ASCII範囲（等価変換）

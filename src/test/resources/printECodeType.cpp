@@ -22,10 +22,10 @@ std::ostream& operator << (std::ostream& os, const ECodeType& eCodeType)
 	case CODE_JIS:			return os << "JIS";
 	case CODE_EUC:			return os << "EUC";
 	case CODE_UTF8:			return os << "UTF8";
-	case CODE_UNICODE:		return os << "UTF16LE";
-	case CODE_UNICODEBE:	return os << "UTF16BE";
-	case (ECodeType)12000:	return os << "UTF32LE";
-	case (ECodeType)12001:	return os << "UTF32BE";
+	case CODE_UTF16LE:		return os << "UTF16LE";
+	case CODE_UTF16BE:		return os << "UTF16BE";
+	case CODE_UTF32LE:		return os << "UTF32LE";
+	case CODE_UTF32BE:		return os << "UTF32BE";
 	case CODE_UTF7:			return os << "UTF7";
 	case CODE_CESU8:		return os << "CESU8";
 	case CODE_LATIN1:		return os << "LATIN1";
