@@ -51,6 +51,24 @@ struct SLoadFromCodeResult {
 	explicit operator bool() const noexcept { return result == RESULT_COMPLETE; }
 };
 
+//! W→A変換結果
+struct SConvertToCodeResult {
+	//! 書き込み結果
+	EConvertResult result;
+
+	//!	書き込み対象データ
+	std::wstring_view source;
+
+	//!	書き込んだ文字数
+	size_t consumed = 0;
+
+	//!	書き込まれたデータ
+	std::string destination{};
+
+	//!	書き込めたかどうか
+	explicit operator bool() const noexcept { return result == RESULT_COMPLETE; }
+};
+
 /*!
 	文字コード基底クラス。
 	

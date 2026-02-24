@@ -68,3 +68,24 @@ SLoadFromCodeResult CCodeFactory::LoadFromCode(ECodeType eCodeType, std::string_
 
 	return SLoadFromCodeResult{ result, code, std::size(code), std::move(loaded) };
 }
+
+/*!
+ * 文字列をバイト列に書き込む。
+ *
+ * @param [in] wide 書き込み対象の文字列。
+ * @returns W→A変換結果。
+ */
+SConvertToCodeResult CCodeFactory::ConvertToCode(ECodeType eCodeType, std::wstring_view wide)
+{
+	// 入力データを準備する
+	CNativeW cSrc{ wide.data(), wide.size() };
+	CMemory cDest;
+
+	// 変換を実行する
+	const auto result = CreateCodeBase(eCodeType)->UnicodeToCode(cSrc, &cDest);
+
+	// 書き込まれたデータを回収する
+	std::string loaded{ LPCSTR(cDest.GetRawPtr()), size_t(cDest.GetRawLength()) };
+
+	return SConvertToCodeResult{ result, wide, std::size(wide), std::move(loaded) };
+}
