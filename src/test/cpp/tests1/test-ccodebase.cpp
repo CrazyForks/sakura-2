@@ -621,46 +621,6 @@ TEST(CCodeBase, codeUtf32Be)
 	EXPECT_THAT(cresult2, IsTrue());
 }
 
-//! EOLテストのためのフィクスチャクラス
-class EolTest : public ::testing::TestWithParam<ECodeType> {};
-
-/*!
- * @brief GetEol代替関数のテスト
- */
-TEST_P(EolTest, test)
-{
-	const auto eCodeType = GetParam();
-	auto pCodeBase = CCodeFactory::CreateCodeBase(eCodeType);
-
-	auto map = pCodeBase->GetEolDefinitions();
-	for( const auto&[t,bin] : map ){
-		CMemory m;
-		pCodeBase->GetEol( &m, t );
-		EXPECT_EQ(0, memcmp(m.GetRawPtr(), bin.data(), bin.length()));
-		EXPECT_EQ(m.GetRawLength(), bin.length());
-	}
-}
-
-/*!
- * @brief パラメータテストをインスタンス化する
- */
-INSTANTIATE_TEST_CASE_P(ParameterizedTestEol
-	, EolTest
-	, ::testing::Values(
-		CODE_SJIS,
-		CODE_JIS,
-		CODE_EUC,
-		CODE_UNICODE,
-		CODE_UTF8,
-		CODE_UTF7,
-		CODE_UNICODEBE,
-		(ECodeType)12000,	// UTF-32LE
-//		(ECodeType)12001,	// UTF-32BE実装は機能していないため除外
-		CODE_CESU8,
-		CODE_LATIN1
-	)
-);
-
 /*!
  * @brief GetBomテストのパラメーター
  *
@@ -709,6 +669,136 @@ INSTANTIATE_TEST_SUITE_P(GetBomCases
 		GetBomTestParam{ CODE_UTF32BE,	std::string{ "\0\0\xFE\xFF", 4 } },
 		GetBomTestParam{ CODE_UTF8,		"\xEF\xBB\xBF" },
 		GetBomTestParam{ CODE_CESU8,	"\xEF\xBB\xBF" }
+	)
+);
+
+/*!
+ * @brief GetEolテストのパラメーター
+ *
+ * @param eCodeType 文字コードセット種別
+ * @param eEolType 行終端子種別
+ * @param optExpected 期待される行終端子のバイナリ表現
+ */
+using GetEolTestParam = std::tuple<ECodeType, EEolType, std::optional<std::string>>;
+
+//! GetEolテストのためのフィクスチャクラス
+class GetEolTest : public ::testing::TestWithParam<GetEolTestParam> {};
+
+/*!
+ * @brief GetEolのテスト
+ */
+TEST_P(GetEolTest, test)
+{
+	const auto  eCodeType   = std::get<0>(GetParam());
+	const auto  eEolType    = std::get<1>(GetParam());
+	const auto& optExpected = std::get<2>(GetParam());
+
+	const auto pCodeBase = CCodeFactory::CreateCodeBase(eCodeType);
+
+	CMemory m;
+	pCodeBase->GetEol(&m, eEolType);
+
+	if (optExpected.has_value()) {
+		const std::string_view eol{ LPCSTR(m.GetRawPtr()), size_t(m.GetRawLength()) };
+		EXPECT_THAT(eol, StrEq(*optExpected));
+	} else {
+		EXPECT_THAT(LPCSTR(m.GetRawPtr()), IsNull());
+	}
+}
+
+/*!
+ * @brief パラメータテストをインスタンス化する
+ */
+INSTANTIATE_TEST_SUITE_P(GetEolCases
+	, GetEolTest
+	, ::testing::Values(
+		GetEolTestParam{ CODE_SJIS,    EEolType::none,                {}     },
+		GetEolTestParam{ CODE_SJIS,    EEolType::cr_and_lf,           "\r\n" },
+		GetEolTestParam{ CODE_SJIS,    EEolType::line_feed,           "\n"   },
+		GetEolTestParam{ CODE_SJIS,    EEolType::carriage_return,     "\r"   },
+		GetEolTestParam{ CODE_SJIS,    EEolType::next_line,           ""     },	//存在しないのでstd::nulloptを返すべき
+		GetEolTestParam{ CODE_SJIS,    EEolType::line_separator,      ""     },	//存在しないのでstd::nulloptを返すべき
+		GetEolTestParam{ CODE_SJIS,    EEolType::paragraph_separator, ""     },	//存在しないのでstd::nulloptを返すべき
+
+		GetEolTestParam{ CODE_JIS,     EEolType::none,                {}     },
+		GetEolTestParam{ CODE_JIS,     EEolType::cr_and_lf,           "\r\n" },
+		GetEolTestParam{ CODE_JIS,     EEolType::line_feed,           "\n"   },
+		GetEolTestParam{ CODE_JIS,     EEolType::carriage_return,     "\r"   },
+		GetEolTestParam{ CODE_JIS,     EEolType::next_line,           ""     },	//存在しないのでstd::nulloptを返すべき
+		GetEolTestParam{ CODE_JIS,     EEolType::line_separator,      ""     },	//存在しないのでstd::nulloptを返すべき
+		GetEolTestParam{ CODE_JIS,     EEolType::paragraph_separator, ""     },	//存在しないのでstd::nulloptを返すべき
+
+		GetEolTestParam{ CODE_EUC,     EEolType::none,                {}     },
+		GetEolTestParam{ CODE_EUC,     EEolType::cr_and_lf,           "\r\n" },
+		GetEolTestParam{ CODE_EUC,     EEolType::line_feed,           "\n"   },
+		GetEolTestParam{ CODE_EUC,     EEolType::carriage_return,     "\r"   },
+		GetEolTestParam{ CODE_EUC,     EEolType::next_line,           ""     },	//存在しないのでstd::nulloptを返すべき
+		GetEolTestParam{ CODE_EUC,     EEolType::line_separator,      ""     },	//存在しないのでstd::nulloptを返すべき
+		GetEolTestParam{ CODE_EUC,     EEolType::paragraph_separator, ""     },	//存在しないのでstd::nulloptを返すべき
+
+		GetEolTestParam{ CODE_LATIN1,  EEolType::none,                {}     },
+		GetEolTestParam{ CODE_LATIN1,  EEolType::cr_and_lf,           "\r\n" },
+		GetEolTestParam{ CODE_LATIN1,  EEolType::line_feed,           "\n"   },
+		GetEolTestParam{ CODE_LATIN1,  EEolType::carriage_return,     "\r"   },
+		GetEolTestParam{ CODE_LATIN1,  EEolType::next_line,           ""     },	//存在しないのでstd::nulloptを返すべき
+		GetEolTestParam{ CODE_LATIN1,  EEolType::line_separator,      ""     },	//存在しないのでstd::nulloptを返すべき
+		GetEolTestParam{ CODE_LATIN1,  EEolType::paragraph_separator, ""     },	//存在しないのでstd::nulloptを返すべき
+
+		GetEolTestParam{ CODE_UTF7,    EEolType::none,                {}      },
+		GetEolTestParam{ CODE_UTF7,    EEolType::cr_and_lf,           "\r\n"  },
+		GetEolTestParam{ CODE_UTF7,    EEolType::line_feed,           "\n"    },
+		GetEolTestParam{ CODE_UTF7,    EEolType::carriage_return,     "\r"    },
+		GetEolTestParam{ CODE_UTF7,    EEolType::next_line,           "+AIU-" },	// UTF-7 には Set B 文字をBase64エンコードする仕様があるので、このテストに意味はない。
+		GetEolTestParam{ CODE_UTF7,    EEolType::line_separator,      "+ICg-" },	// UTF-7 には Set B 文字をBase64エンコードする仕様があるので、このテストに意味はない。
+		GetEolTestParam{ CODE_UTF7,    EEolType::paragraph_separator, "+ICk-" },	// UTF-7 には Set B 文字をBase64エンコードする仕様があるので、このテストに意味はない。
+
+		GetEolTestParam{ CODE_UTF16LE, EEolType::none,                {}                                },
+		GetEolTestParam{ CODE_UTF16LE, EEolType::cr_and_lf,           std::string_view{ "\r\0\n\0", 4 } },
+		GetEolTestParam{ CODE_UTF16LE, EEolType::line_feed,           std::string_view{ "\n\0", 2 }     },
+		GetEolTestParam{ CODE_UTF16LE, EEolType::carriage_return,     std::string_view{ "\r\0", 2 }     },
+		GetEolTestParam{ CODE_UTF16LE, EEolType::next_line,           std::string_view{ "\x85\0", 2 }   },
+		GetEolTestParam{ CODE_UTF16LE, EEolType::line_separator,      std::string_view{ "\x28\x20", 2 } },
+		GetEolTestParam{ CODE_UTF16LE, EEolType::paragraph_separator, std::string_view{ "\x29\x20", 2 } },
+
+		GetEolTestParam{ CODE_UTF16BE, EEolType::none,                {}                                },
+		GetEolTestParam{ CODE_UTF16BE, EEolType::cr_and_lf,           std::string_view{ "\0\r\0\n", 4 } },
+		GetEolTestParam{ CODE_UTF16BE, EEolType::line_feed,           std::string_view{ "\0\n", 2 }     },
+		GetEolTestParam{ CODE_UTF16BE, EEolType::carriage_return,     std::string_view{ "\0\r", 2 }     },
+		GetEolTestParam{ CODE_UTF16BE, EEolType::next_line,           std::string_view{ "\0\x85", 2 }   },
+		GetEolTestParam{ CODE_UTF16BE, EEolType::line_separator,      std::string_view{ "\x20\x28", 2 } },
+		GetEolTestParam{ CODE_UTF16BE, EEolType::paragraph_separator, std::string_view{ "\x20\x29", 2 } },
+
+		GetEolTestParam{ CODE_UTF32LE, EEolType::none,                {}                                        },
+		GetEolTestParam{ CODE_UTF32LE, EEolType::cr_and_lf,           std::string_view{ "\r\0\0\0\n\0\0\0", 8 } },
+		GetEolTestParam{ CODE_UTF32LE, EEolType::line_feed,           std::string_view{ "\n\0\0\0", 4 }         },
+		GetEolTestParam{ CODE_UTF32LE, EEolType::carriage_return,     std::string_view{ "\r\0\0\0", 4 }         },
+		GetEolTestParam{ CODE_UTF32LE, EEolType::next_line,           std::string_view{ "\x85\0\0\0", 4 }       },
+		GetEolTestParam{ CODE_UTF32LE, EEolType::line_separator,      std::string_view{ "\x28\x20\0\0", 4 }     },
+		GetEolTestParam{ CODE_UTF32LE, EEolType::paragraph_separator, std::string_view{ "\x29\x20\0\0", 4 }     },
+
+		GetEolTestParam{ CODE_UTF32BE, EEolType::none,                {}                                        },
+		GetEolTestParam{ CODE_UTF32BE, EEolType::cr_and_lf,           std::string_view{ "\0\0\0\r\0\0\0\n", 8 } },
+		GetEolTestParam{ CODE_UTF32BE, EEolType::line_feed,           std::string_view{ "\0\0\0\n", 4 }         },
+		GetEolTestParam{ CODE_UTF32BE, EEolType::carriage_return,     std::string_view{ "\0\0\0\r", 4 }         },
+		GetEolTestParam{ CODE_UTF32BE, EEolType::next_line,           std::string_view{ "\0\0\0\x85", 4 }       },
+		GetEolTestParam{ CODE_UTF32BE, EEolType::line_separator,      std::string_view{ "\0\0\x20\x28", 4 }     },
+		GetEolTestParam{ CODE_UTF32BE, EEolType::paragraph_separator, std::string_view{ "\0\0\x20\x29", 4 }     },
+
+		GetEolTestParam{ CODE_UTF8,    EEolType::none,                {}             },
+		GetEolTestParam{ CODE_UTF8,    EEolType::cr_and_lf,           "\r\n"         },
+		GetEolTestParam{ CODE_UTF8,    EEolType::line_feed,           "\n"           },
+		GetEolTestParam{ CODE_UTF8,    EEolType::carriage_return,     "\r"           },
+		GetEolTestParam{ CODE_UTF8,    EEolType::next_line,           "\xC2\x85"     },
+		GetEolTestParam{ CODE_UTF8,    EEolType::line_separator,      "\xE2\x80\xA8" },
+		GetEolTestParam{ CODE_UTF8,    EEolType::paragraph_separator, "\xE2\x80\xA9" },
+
+		GetEolTestParam{ CODE_CESU8,   EEolType::none,                {}             },
+		GetEolTestParam{ CODE_CESU8,   EEolType::cr_and_lf,           "\r\n"         },
+		GetEolTestParam{ CODE_CESU8,   EEolType::line_feed,           "\n"           },
+		GetEolTestParam{ CODE_CESU8,   EEolType::carriage_return,     "\r"           },
+		GetEolTestParam{ CODE_CESU8,   EEolType::next_line,           "\xC2\x85"     },
+		GetEolTestParam{ CODE_CESU8,   EEolType::line_separator,      "\xE2\x80\xA8" },
+		GetEolTestParam{ CODE_CESU8,   EEolType::paragraph_separator, "\xE2\x80\xA9" }
 	)
 );
 
