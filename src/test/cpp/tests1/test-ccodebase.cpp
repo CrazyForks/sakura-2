@@ -661,47 +661,54 @@ INSTANTIATE_TEST_CASE_P(ParameterizedTestEol
 	)
 );
 
-//! BOMテストのためのパラメータ型
-using BomTestParamType = std::tuple<ECodeType, std::string_view>;
+/*!
+ * @brief GetBomテストのパラメーター
+ *
+ * @param eCodeType 文字コードセット種別
+ * @param optExpected 期待されるBOMのバイナリ表現
+ */
+using GetBomTestParam = std::tuple<ECodeType, std::optional<std::string>>;
 
-//! BOMテストのためのフィクスチャクラス
-class BomTest : public ::testing::TestWithParam<BomTestParamType> {};
+//! GetBomテストのためのフィクスチャクラス
+class GetBomTest : public ::testing::TestWithParam<GetBomTestParam> {};
 
 /*!
- * @brief GetBom代替関数のテスト
+ * @brief GetBomのテスト
  */
-TEST_P(BomTest, test) {
-	const auto eCodeType = std::get<0>(GetParam());
-	auto pCodeBase = CCodeFactory::CreateCodeBase(eCodeType);
+TEST_P(GetBomTest, test) {
+	const auto  eCodeType   = std::get<0>(GetParam());
+	const auto& optExpected = std::get<1>(GetParam());
 
-	const auto str = std::get<1>(GetParam());
-	BinarySequenceView expected(reinterpret_cast<const std::byte*>(str.data()), str.length());
-
-	const auto actual = pCodeBase->GetBomDefinition();
-
-	ASSERT_EQ(expected, actual);
+	const auto pCodeBase = CCodeFactory::CreateCodeBase(eCodeType);
 
 	CMemory m;
-	pCodeBase->GetBom( &m );
-	EXPECT_EQ(0, memcmp(m.GetRawPtr(), actual.data(), actual.length()));
-	EXPECT_EQ(m.GetRawLength(), actual.length());
+	pCodeBase->GetBom(&m);
+
+	if (optExpected.has_value()) {
+		const std::string_view bom{ LPCSTR(m.GetRawPtr()), size_t(m.GetRawLength()) };
+		EXPECT_THAT(bom, StrEq(*optExpected));
+	} else {
+		EXPECT_THAT(LPCSTR(m.GetRawPtr()), IsNull());
+	}
 }
 
 /*!
  * @brief パラメータテストをインスタンス化する
  */
-INSTANTIATE_TEST_CASE_P(ParameterizedTestBom
-	, BomTest
+INSTANTIATE_TEST_SUITE_P(GetBomCases
+	, GetBomTest
 	, ::testing::Values(
-		BomTestParamType{ CODE_SJIS,		{} },				// 非Unicodeなので実施する意味はない
-		BomTestParamType{ CODE_JIS,			{} },				// 非Unicodeなので実施する意味はない
-		BomTestParamType{ CODE_EUC,			{} },				// 非Unicodeなので実施する意味はない
-		BomTestParamType{ CODE_UNICODE,		"\xFF\xFE" },
-		BomTestParamType{ CODE_UTF8,		"\xEF\xBB\xBF" },
-		BomTestParamType{ CODE_UTF7,		"+/v8-" },			// 対象外なので実施する意味はない
-		BomTestParamType{ CODE_UNICODEBE,	"\xFE\xFF" },
-		BomTestParamType{ CODE_LATIN1,		{} },				// 非Unicodeなので実施する意味はない
-		BomTestParamType{ CODE_CESU8,		"\xEF\xBB\xBF" }
+		GetBomTestParam{ CODE_SJIS,		{} },			// 非Unicodeなので実施する意味はない
+		GetBomTestParam{ CODE_JIS,		{} },			// 非Unicodeなので実施する意味はない
+		GetBomTestParam{ CODE_EUC,		{} },			// 非Unicodeなので実施する意味はない
+		GetBomTestParam{ CODE_LATIN1,	{} },			// 非Unicodeなので実施する意味はない
+		GetBomTestParam{ CODE_UTF7,		"+/v8-" },		// 対象外なので実施する意味はない
+		GetBomTestParam{ CODE_UTF16LE,	"\xFF\xFE" },
+		GetBomTestParam{ CODE_UTF16BE,	"\xFE\xFF" },
+		GetBomTestParam{ CODE_UTF32LE,	std::string{ "\xFF\xFE\0\0", 4 } },
+		GetBomTestParam{ CODE_UTF32BE,	std::string{ "\0\0\xFE\xFF", 4 } },
+		GetBomTestParam{ CODE_UTF8,		"\xEF\xBB\xBF" },
+		GetBomTestParam{ CODE_CESU8,	"\xEF\xBB\xBF" }
 	)
 );
 
