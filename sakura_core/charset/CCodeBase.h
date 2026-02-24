@@ -33,6 +33,24 @@ using BinarySequenceView = std::basic_string_view<std::byte>;
 //! 復元後バイナリシーケンスを表す型。
 using BinarySequence = std::basic_string<std::byte>;
 
+//! A→W変換結果
+struct SLoadFromCodeResult {
+	//! 読み込み結果
+	EConvertResult result;
+
+	//!	読み込み対象データ
+	std::string_view source;
+
+	//!	読み込んだ文字数
+	size_t consumed = 0;
+
+	//!	読み込まれたデータ
+	std::wstring destination{};
+
+	//!	読み込めたかどうか
+	explicit operator bool() const noexcept { return result == RESULT_COMPLETE; }
+};
+
 /*!
 	文字コード基底クラス。
 	
