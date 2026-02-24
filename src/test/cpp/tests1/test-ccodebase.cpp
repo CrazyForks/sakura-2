@@ -1,5 +1,5 @@
 ﻿/*
-	Copyright (C) 2021-2022, Sakura Editor Organization
+	Copyright (C) 2021-2026, Sakura Editor Organization
 
 	SPDX-License-Identifier: Zlib
 */
@@ -7,49 +7,49 @@
 #include "pch.h"
 #include "charset/CCodeFactory.h"
 
-#include <cstdlib>
-#include <ostream>
+namespace convert {
 
-#include "env/CommonSetting.h"
+/*!
+ * @brief MIMEヘッダーデコードテストのパラメーター
+ *
+ * @param eCodeType 文字コードセット種別
+ * @param input デコードする文字列
+ * @param optExpected デコードされたバイト列の期待値
+ */
+using MIMEHeaderDecodeTestParam = std::tuple<ECodeType, std::string_view, std::optional<std::string>>;
 
-TEST(CCodeBase, MIMEHeaderDecode)
+//! MIMEヘッダーデコードテスト
+struct MIMEHeaderDecodeTest : public ::testing::TestWithParam<MIMEHeaderDecodeTestParam> {};
+
+TEST_P(MIMEHeaderDecodeTest, DoDecode)
 {
+	const auto  eCodeType   = std::get<0>(GetParam());
+	const auto  input       = std::get<1>(GetParam());
+	const auto& optExpected = std::get<2>(GetParam());
+
 	CMemory m;
+	const auto result = CCodeBase::MIMEHeaderDecode(std::data(input), std::size(input), &m, eCodeType);
 
-	// Base64 JIS
-	std::string source1("From: =?iso-2022-jp?B?GyRCJTUlLyVpGyhC?=");
-	EXPECT_TRUE(CCodeBase::MIMEHeaderDecode(source1.c_str(), source1.length(), &m, CODE_JIS));
-	EXPECT_STREQ(reinterpret_cast<char*>(m.GetRawPtr()), "From: $B%5%/%i(B");
+	EXPECT_THAT((bool)result, optExpected.has_value());
 
-	// Base64 UTF-8
-	std::string source2("From: =?utf-8?B?44K144Kv44Op?=");
-	EXPECT_TRUE(CCodeBase::MIMEHeaderDecode(source2.c_str(), source2.length(), &m, CODE_UTF8));
-	EXPECT_STREQ(reinterpret_cast<char*>(m.GetRawPtr()), "From: \xe3\x82\xb5\xe3\x82\xaf\xe3\x83\xa9");
-
-	// QP UTF-8
-	std::string source3("From: =?utf-8?Q?=E3=82=B5=E3=82=AF=E3=83=A9!?=");
-	EXPECT_TRUE(CCodeBase::MIMEHeaderDecode(source3.c_str(), source3.length(), &m, CODE_UTF8));
-	EXPECT_STREQ(reinterpret_cast<char*>(m.GetRawPtr()), "From: \xe3\x82\xb5\xe3\x82\xaf\xe3\x83\xa9!");
-
-	// 引数の文字コードとヘッダー内の文字コードが異なる場合は変換しない
-	EXPECT_TRUE(CCodeBase::MIMEHeaderDecode(source1.c_str(), source1.length(), &m, CODE_UTF8));
-	EXPECT_STREQ(reinterpret_cast<char*>(m.GetRawPtr()), source1.c_str());
-
-	// 対応していない文字コードなら変換しない
-	std::string source4("From: =?utf-7?B?+MLUwrzDp-");
-	EXPECT_TRUE(CCodeBase::MIMEHeaderDecode(source4.c_str(), source4.length(), &m, CODE_UTF7));
-	EXPECT_STREQ(reinterpret_cast<char*>(m.GetRawPtr()), source4.c_str());
-
-	// 謎の符号化方式が指定されていたら何もしない
-	std::string source5("From: =?iso-2022-jp?X?GyRCJTUlLyVpGyhC?=");
-	EXPECT_TRUE(CCodeBase::MIMEHeaderDecode(source5.c_str(), source5.length(), &m, CODE_JIS));
-	EXPECT_STREQ(reinterpret_cast<char*>(m.GetRawPtr()), source5.c_str());
-
-	// 末尾の ?= がなければ変換しない
-	std::string source6("From: =?iso-2022-jp?B?GyRCJTUlLyVpGyhC");
-	EXPECT_TRUE(CCodeBase::MIMEHeaderDecode(source6.c_str(), source6.length(), &m, CODE_JIS));
-	EXPECT_STREQ(reinterpret_cast<char*>(m.GetRawPtr()), source6.c_str());
+	if (optExpected.has_value()) {
+		const std::string_view decoded{ LPCSTR(m.GetRawPtr()), size_t(m.GetRawLength()) };
+		EXPECT_THAT(decoded, StrEq(*optExpected));
+	}
 }
+
+INSTANTIATE_TEST_SUITE_P(
+	MIMEHeaderCases,
+	MIMEHeaderDecodeTest,
+	::testing::Values(
+		MIMEHeaderDecodeTestParam{ CODE_JIS,  "From: =?iso-2022-jp?B?GyRCJTUlLyVpGyhC?=",       "From: $B%5%/%i(B" },							// Base64 JIS
+		MIMEHeaderDecodeTestParam{ CODE_UTF8, "From: =?utf-8?B?44K144Kv44Op?=",                 "From: \xe3\x82\xb5\xe3\x82\xaf\xe3\x83\xa9" },		// Base64 UTF-8
+		MIMEHeaderDecodeTestParam{ CODE_UTF8, "From: =?utf-8?Q?=E3=82=B5=E3=82=AF=E3=83=A9!?=", "From: \xe3\x82\xb5\xe3\x82\xaf\xe3\x83\xa9!" },	// Quoted Printable UTF-8
+		MIMEHeaderDecodeTestParam{ CODE_UTF8, "From: =?iso-2022-jp?B?GyRCJTUlLyVpGyhC?=",       "From: =?iso-2022-jp?B?GyRCJTUlLyVpGyhC?=" },		// 引数の文字コードとヘッダー内の文字コードが異なる場合は変換しない
+		MIMEHeaderDecodeTestParam{ CODE_UTF7, "From: =?utf-7?B?+MLUwrzDp-",                     "From: =?utf-7?B?+MLUwrzDp-" },						// 対応していない文字コードなら変換しない
+		MIMEHeaderDecodeTestParam{ CODE_UTF8, "From: =?iso-2022-jp?X?GyRCJTUlLyVpGyhC?=",       "From: =?iso-2022-jp?X?GyRCJTUlLyVpGyhC?=" },		// 謎の符号化方式が指定されていたら何もしない
+		MIMEHeaderDecodeTestParam{ CODE_JIS,  "From: =?iso-2022-jp?B?GyRCJTUlLyVpGyhC",         "From: =?iso-2022-jp?B?GyRCJTUlLyVpGyhC" }			// 末尾の ?= がなければ変換しない
+	));
 
 /*!
  * @brief 文字コード変換のテスト
@@ -655,6 +655,8 @@ INSTANTIATE_TEST_CASE_P(ParameterizedTestBom
 		BomTestParamType{ CODE_CESU8,		"\xEF\xBB\xBF" }
 	)
 );
+
+} // namespace  convert
 
 //! 表示用16進変換テストのためのフィクスチャクラス
 class CodeToHexTest : public ::testing::TestWithParam<ECodeType> {};
