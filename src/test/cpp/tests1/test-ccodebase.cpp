@@ -9,6 +9,102 @@
 
 namespace convert {
 
+std::string ToUtf16LeBytes(std::string_view ascii)
+{
+	std::string dest;
+	dest.reserve(ascii.size() * 2);
+	std::ranges::for_each(ascii, [&dest](char8_t c) {
+		dest += LOBYTE(c);
+		dest += '\0';
+	});
+	return dest;
+}
+
+std::string ToUtf16LeBytes(std::wstring_view wide)
+{
+	std::string dest;
+	dest.reserve(wide.size() * 2);
+	std::ranges::for_each(wide, [&dest](uchar16_t c) {
+		dest += LOBYTE(c);
+		dest += HIBYTE(c);
+	});
+	return dest;
+}
+
+std::string ToUtf16BeBytes(std::string_view ascii)
+{
+	std::string dest;
+	dest.reserve(ascii.size() * 2);
+	std::ranges::for_each(ascii, [&dest](char8_t c) {
+		dest += '\0';
+		dest += LOBYTE(c);
+	});
+	return dest;
+}
+
+std::string ToUtf16BeBytes(std::wstring_view wide)
+{
+	std::string dest;
+	dest.reserve(wide.size() * 2);
+	std::ranges::for_each(wide, [&dest](uchar16_t c) {
+		dest += HIBYTE(c);
+		dest += LOBYTE(c);
+	});
+	return dest;
+}
+
+std::string ToUtf32LeBytes(std::string_view ascii)
+{
+	std::string dest;
+	dest.reserve(ascii.size() * 4);
+	std::ranges::for_each(ascii, [&dest](uchar32_t c) {
+		dest += LOBYTE(LOWORD(c));
+		dest += HIBYTE(LOWORD(c));
+		dest += LOBYTE(HIWORD(c));
+		dest += HIBYTE(HIWORD(c));
+	});
+	return dest;
+}
+
+std::string ToUtf32LeBytes(std::wstring_view wide)
+{
+	std::string dest;
+	dest.reserve(wide.size() * 2);
+	std::ranges::for_each(wide, [&dest](uchar32_t c) {
+		dest += LOBYTE(LOWORD(c));
+		dest += HIBYTE(LOWORD(c));
+		dest += LOBYTE(HIWORD(c));
+		dest += HIBYTE(HIWORD(c));
+	});
+	return dest;
+}
+
+std::string ToUtf32BeBytes(std::string_view ascii)
+{
+	std::string dest;
+	dest.reserve(ascii.size() * 4);
+	std::ranges::for_each(ascii, [&dest](uchar32_t c) {
+		dest += HIBYTE(HIWORD(c));
+		dest += LOBYTE(HIWORD(c));
+		dest += HIBYTE(LOWORD(c));
+		dest += LOBYTE(LOWORD(c));
+	});
+	return dest;
+}
+
+std::string ToUtf32BeBytes(std::wstring_view wide)
+{
+	std::string dest;
+	dest.reserve(wide.size() * 2);
+	std::ranges::for_each(wide, [&dest](uchar32_t c) {
+		dest += HIBYTE(HIWORD(c));
+		dest += LOBYTE(HIWORD(c));
+		dest += HIBYTE(LOWORD(c));
+		dest += LOBYTE(LOWORD(c));
+	});
+	return dest;
+}
+
 /*!
  * @brief MIMEヘッダーデコードテストのパラメーター
  *
@@ -63,29 +159,25 @@ TEST(CCodeBase, codeSJis)
 	constexpr const auto& mbsAscii = "\x01\x02\x03\x04\x05\x06\a\b\t\n\v\f\r\x0E\x0F\x10\x11\x12\x13\x14\x15\x16\x17\x18\x19\x1A\x1B\x1C\x1D\x1E\x1F !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~\x7F";
 	constexpr const auto& wcsAscii = L"\x01\x02\x03\x04\x05\x06\a\b\t\n\v\f\r\x0E\x0F\x10\x11\x12\x13\x14\x15\x16\x17\x18\x19\x1A\x1B\x1C\x1D\x1E\x1F !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~\x7F";
 
-	bool bComplete1_1 = false;
-	auto encoded1 = pCodeBase->CodeToUnicode( BinarySequenceView( reinterpret_cast<const std::byte*>(mbsAscii), int(std::size(mbsAscii)) ), &bComplete1_1 );
-	EXPECT_STREQ( wcsAscii, encoded1.GetStringPtr() );
-	EXPECT_TRUE( bComplete1_1 );
+	auto result1 = CCodeFactory::LoadFromCode(eCodeType, mbsAscii);
+	EXPECT_THAT(result1.destination, StrEq(wcsAscii));
+	EXPECT_THAT(result1, IsTrue());
 
-	bool bComplete1_2 = false;
-	auto decoded1 = pCodeBase->UnicodeToCode( encoded1, &bComplete1_2 );
-	EXPECT_EQ( 0, memcmp( mbsAscii, decoded1.data(), decoded1.size() ) );
-	EXPECT_TRUE( bComplete1_2 );
+	auto cresult1 = CCodeFactory::ConvertToCode(eCodeType, result1.destination);
+	EXPECT_THAT(cresult1.destination, StrEq(mbsAscii));
+	EXPECT_THAT(cresult1, IsTrue());
 
 	// かな漢字の変換（Shift-JIS仕様）
 	constexpr const auto& wcsKanaKanji = L"ｶﾅかなカナ漢字";
 	constexpr const auto& mbsKanaKanji = "\xB6\xC5\x82\xA9\x82\xC8\x83\x4A\x83\x69\x8A\xBF\x8E\x9A";
 
-	bool bComplete2_1 = false;
-	auto encoded2 = pCodeBase->CodeToUnicode( BinarySequenceView( reinterpret_cast<const std::byte*>(mbsKanaKanji), int(std::size(mbsKanaKanji)) ), &bComplete2_1 );
-	ASSERT_STREQ( wcsKanaKanji, encoded2.GetStringPtr() );
-	ASSERT_TRUE( bComplete2_1 );
+	auto result2 = CCodeFactory::LoadFromCode(eCodeType, mbsKanaKanji);
+	EXPECT_THAT(result2.destination, StrEq(wcsKanaKanji));
+	EXPECT_THAT(result2, IsTrue());
 
-	bool bComplete2_2 = false;
-	auto decoded2 = pCodeBase->UnicodeToCode( encoded2, &bComplete2_2 );
-	ASSERT_EQ( 0, memcmp( mbsKanaKanji, decoded2.data(), decoded2.size() ) );
-	ASSERT_TRUE( bComplete2_2 );
+	auto cresult2 = CCodeFactory::ConvertToCode(eCodeType, result2.destination);
+	EXPECT_THAT(cresult2.destination, StrEq(mbsKanaKanji));
+	EXPECT_THAT(cresult2, IsTrue());
 
 	// Unicodeから変換できない文字（Shift-JIS仕様）
 	// 1. SJIS⇒Unicode変換ができても、元に戻せない文字は変換失敗と看做す。
@@ -107,19 +199,63 @@ TEST(CCodeBase, codeSJis)
 		L"\xDC81\n\xDC81\x7F\xDC81\xDCFD\xDC81\xDCFE\xDC81\xDCFF"
 		;
 
-	bool bComplete3_1 = true;
-	auto encoded3 = pCodeBase->CodeToUnicode( BinarySequenceView( reinterpret_cast<const std::byte*>(mbsCantConvSJis), int(std::size(mbsCantConvSJis)) ), &bComplete3_1 );
-	ASSERT_STREQ( wcsCantConvSJis, encoded3.GetStringPtr() );
-	ASSERT_TRUE( bComplete3_1 );	//👈 仕様バグ。変換できないので false が返るべき。
+	auto result3 = CCodeFactory::LoadFromCode(eCodeType, mbsCantConvSJis);
+	EXPECT_THAT(result3.destination, StrEq(wcsCantConvSJis));
+	EXPECT_THAT(result3, IsTrue());	//👈 仕様バグ。変換できないので true が返るべき。
 
 	// Unicodeから変換できない文字（Shift-JIS仕様）
 	constexpr const auto& wcsOGuy = L"森鷗外";
 	constexpr const auto& mbsOGuy = "\x90\x58\x3F\x8A\x4F"; //森?外
 
-	bool bComplete4_2 = true;
-	auto decoded4 = pCodeBase->UnicodeToCode( wcsOGuy, &bComplete4_2 );
-	ASSERT_EQ( 0, memcmp( mbsOGuy, decoded4.data(), decoded4.size() ) );
-	ASSERT_FALSE( bComplete4_2 );
+	const auto cresult4 = CCodeFactory::ConvertToCode(eCodeType, wcsOGuy);
+	EXPECT_THAT(cresult4.destination, StrEq(mbsOGuy));
+	EXPECT_THAT(cresult4, IsFalse());
+}
+
+/*!
+ * @brief 文字コード変換のテスト
+ */
+TEST(CCodeBase, codeJis)
+{
+	const auto eCodeType = CODE_JIS;
+
+	// 7bit ASCII範囲（ISO-2022-JP仕様）
+	constexpr const auto& mbsAscii = "\x1\x2\x3\x4\x5\x6\a\b\t\n\v\f\r\xE\xF\x10\x11\x12\x13\x14\x15\x16\x17\x18\x19\x1A\x1B\x1C\x1D\x1E\x1F !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~\x7F";
+	constexpr const auto& wcsAscii = L"\x1\x2\x3\x4\x5\x6\a\b\t\n\v\f\r\xE\xF\x10\x11\x12\x13\x14\x15\x16\x17\x18\x19\x1A\xDC1B\xDC1C\xDC1D\xDC1E\xDC1F\xDC20!\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~\x7F";
+
+	// 不具合1: 不正なエスケープシーケンスをエラーバイナリに格納してない
+	// 不具合2: C0領域の文字 DEL(0x7F) を取り込めてない
+	auto result1 = CCodeFactory::LoadFromCode(eCodeType, mbsAscii);
+	EXPECT_THAT(result1.destination, StrEq(L"\x1\x2\x3\x4\x5\x6\a\b\t\n\v\f\r\xE\xF\x10\x11\x12\x13\x14\x15\x16\x17\x18\x19\x1A???!\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~?"));
+	EXPECT_THAT(result1, IsFalse());	// 👈 不正なエスケープシーケンスを検出してるので戻り値は false で正しい。
+
+	result1.destination = wcsAscii;
+
+	// 不具合3: エラーバイナリを復元してない
+	auto cresult1 = CCodeFactory::ConvertToCode(eCodeType, result1.destination);
+	EXPECT_THAT(cresult1.destination, StrEq("\x1\x2\x3\x4\x5\x6\a\b\t\n\v\f\r\xE\xF\x10\x11\x12\x13\x14\x15\x16\x17\x18\x19\x1A??????!\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~\x7F"));
+	EXPECT_THAT(cresult1, IsFalse());	// 👈 エラーバイナリの復元はエラーではないので true を返すべき。
+
+	// かな漢字の変換（ISO-2022-JP仕様）
+	constexpr const auto& wcsKanaKanji = L"ｶﾅかなカナ漢字";
+	constexpr const auto& mbsKanaKanji = "\x1B(I6E\x1B$B$+$J%+%J4A;z\x1B(B";
+
+	auto result2 = CCodeFactory::LoadFromCode(eCodeType, mbsKanaKanji);
+	EXPECT_THAT(result2.destination, StrEq(wcsKanaKanji));
+	EXPECT_THAT(result2, IsTrue());
+
+	auto cresult2 = CCodeFactory::ConvertToCode(eCodeType, result2.destination);
+	EXPECT_THAT(cresult2.destination, StrEq(mbsKanaKanji));
+	EXPECT_THAT(cresult2, IsTrue());
+
+	// JIS範囲外（ありえない値を使う。Windows拡張があるため境界テスト不可。）
+	EXPECT_THAT(CCodeFactory::LoadFromCode(eCodeType, "\x1B$B\xFF\xFF\x1B(B").result, RESULT_LOSESOME);
+
+	// 不正なエスケープシーケンス（JIS X 0212には非対応。）
+	EXPECT_THAT(CCodeFactory::LoadFromCode(eCodeType, "\x1B(D33\x1B(B").result, RESULT_LOSESOME);
+
+	// Shift-Jisに変換できない文字
+	EXPECT_THAT(CCodeFactory::ConvertToCode(eCodeType, L"\u9DD7").result, RESULT_LOSESOME);	// 森鴎外の鷗
 }
 
 /*!
@@ -134,29 +270,25 @@ TEST(CCodeBase, codeEucJp)
 	constexpr const auto& mbsAscii = "\x01\x02\x03\x04\x05\x06\a\b\t\n\v\f\r\x0E\x0F\x10\x11\x12\x13\x14\x15\x16\x17\x18\x19\x1A\x1B\x1C\x1D\x1E\x1F !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~\x7F";
 	constexpr const auto& wcsAscii = L"\x01\x02\x03\x04\x05\x06\a\b\t\n\v\f\r\x0E\x0F\x10\x11\x12\x13\x14\x15\x16\x17\x18\x19\x1A\x1B\x1C\x1D\x1E\x1F !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~\x7F";
 
-	bool bComplete1_1 = false;
-	auto encoded1 = pCodeBase->CodeToUnicode( BinarySequenceView( reinterpret_cast<const std::byte*>(mbsAscii), int(std::size(mbsAscii)) ), &bComplete1_1 );
-	EXPECT_STREQ( wcsAscii, encoded1.GetStringPtr() );
-	EXPECT_TRUE( bComplete1_1 );
+	auto result1 = CCodeFactory::LoadFromCode(eCodeType, mbsAscii);
+	EXPECT_THAT(result1.destination, StrEq(wcsAscii));
+	EXPECT_THAT(result1, IsTrue());
 
-	bool bComplete1_2 = false;
-	auto decoded1 = pCodeBase->UnicodeToCode( encoded1, &bComplete1_2 );
-	EXPECT_EQ( 0, memcmp( mbsAscii, decoded1.data(), decoded1.size() ) );
-	EXPECT_TRUE( bComplete1_2 );
+	auto cresult1 = CCodeFactory::ConvertToCode(eCodeType, result1.destination);
+	EXPECT_THAT(cresult1.destination, StrEq(mbsAscii));
+	EXPECT_THAT(cresult1, IsTrue());
 
 	// かな漢字の変換（EUC-JP仕様）
 	constexpr const auto& wcsKanaKanji = L"ｶﾅかなカナ漢字";
 	constexpr const auto& mbsKanaKanji = "\x8E\xB6\x8E\xC5\xA4\xAB\xA4\xCA\xA5\xAB\xA5\xCA\xB4\xC1\xBB\xFA";
 
-	bool bComplete2_1 = false;
-	auto encoded2 = pCodeBase->CodeToUnicode( BinarySequenceView( reinterpret_cast<const std::byte*>(mbsKanaKanji), int(std::size(mbsKanaKanji)) ), &bComplete2_1 );
-	ASSERT_STREQ( wcsKanaKanji, encoded2.GetStringPtr() );
-	ASSERT_TRUE( bComplete2_1 );
+	auto result2 = CCodeFactory::LoadFromCode(eCodeType, mbsKanaKanji);
+	EXPECT_THAT(result2.destination, StrEq(wcsKanaKanji));
+	EXPECT_THAT(result2, IsTrue());
 
-	bool bComplete2_2 = false;
-	auto decoded2 = pCodeBase->UnicodeToCode( encoded2, &bComplete2_2 );
-	ASSERT_EQ( 0, memcmp( mbsKanaKanji, decoded2.data(), decoded2.size() ) );
-	ASSERT_TRUE( bComplete2_2 );
+	auto cresult2 = CCodeFactory::ConvertToCode(eCodeType, result2.destination);
+	EXPECT_THAT(cresult2.destination, StrEq(mbsKanaKanji));
+	EXPECT_THAT(cresult2, IsTrue());
 
 	// Unicodeから変換できない文字（EUC-JP仕様）
 	// （保留）
@@ -169,10 +301,9 @@ TEST(CCodeBase, codeEucJp)
 		L""
 		;
 
-	bool bComplete3_1 = true;
-	auto encoded3 = pCodeBase->CodeToUnicode( BinarySequenceView( reinterpret_cast<const std::byte*>(mbsCantConvEucJp), int(std::size(mbsCantConvEucJp)) ), &bComplete3_1 );
-	//ASSERT_STREQ( wcsCantConvEucJp, encoded3.GetStringPtr() );
-	//ASSERT_FALSE( bComplete3_1 );
+	auto result3 = CCodeFactory::LoadFromCode(eCodeType, mbsCantConvEucJp);
+	//ASSERT_THAT(result3.destination, StrEq(wcsCantConvEucJp));
+	//ASSERT_THAT(result3.losesome, IsFalse());
 
 	// Unicodeから変換できない文字（EUC-JP仕様）
 	constexpr const auto& wcsOGuy = L"森鷗外";
@@ -180,12 +311,11 @@ TEST(CCodeBase, codeEucJp)
 
 	// 本来のEUC-JPは「森鷗外」を正確に表現できるため、不具合と考えられる。
 	//constexpr const auto& wcsOGuy = L"森鷗外";
-	//constexpr const auto& mbsOGuy = "\xBF\xB9\x8F\xEC\xBF\xB3\xB0";
+	//constexpr const auto& mbsOGuy = "\xBF\xB9\x8F\xEC\x3F\xB3\xB0";
 
-	bool bComplete4_2 = true;
-	auto decoded4 = pCodeBase->UnicodeToCode( wcsOGuy, &bComplete4_2 );
-	ASSERT_EQ( 0, memcmp( mbsOGuy, decoded4.data(), decoded4.size() ) );
-	ASSERT_FALSE( bComplete4_2 );
+	const auto cresult4 = CCodeFactory::ConvertToCode(eCodeType, wcsOGuy);
+	EXPECT_THAT(cresult4.destination, StrEq(mbsOGuy));
+	EXPECT_THAT(cresult4, IsFalse());
 }
 
 /*!
@@ -194,21 +324,18 @@ TEST(CCodeBase, codeEucJp)
 TEST(CCodeBase, codeLatin1)
 {
 	const auto eCodeType = CODE_LATIN1;
-	auto pCodeBase = CCodeFactory::CreateCodeBase( eCodeType );
 
 	// 7bit ASCII範囲（等価変換）
 	constexpr const auto& mbsAscii = "\x01\x02\x03\x04\x05\x06\a\b\t\n\v\f\r\x0E\x0F\x10\x11\x12\x13\x14\x15\x16\x17\x18\x19\x1A\x1B\x1C\x1D\x1E\x1F !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~\x7F";
 	constexpr const auto& wcsAscii = L"\x01\x02\x03\x04\x05\x06\a\b\t\n\v\f\r\x0E\x0F\x10\x11\x12\x13\x14\x15\x16\x17\x18\x19\x1A\x1B\x1C\x1D\x1E\x1F !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~\x7F";
 
-	bool bComplete1_1 = false;
-	auto encoded1 = pCodeBase->CodeToUnicode( BinarySequenceView( reinterpret_cast<const std::byte*>(mbsAscii), int(std::size(mbsAscii)) ), &bComplete1_1 );
-	EXPECT_STREQ( wcsAscii, encoded1.GetStringPtr() );
-	EXPECT_TRUE( bComplete1_1 );
+	auto result1 = CCodeFactory::LoadFromCode(eCodeType, mbsAscii);
+	EXPECT_THAT(result1.destination, StrEq(wcsAscii));
+	EXPECT_THAT(result1, IsTrue());
 
-	bool bComplete1_2 = false;
-	auto decoded1 = pCodeBase->UnicodeToCode( encoded1, &bComplete1_2 );
-	EXPECT_EQ( 0, memcmp( mbsAscii, decoded1.data(), decoded1.size() ) );
-	EXPECT_TRUE( bComplete1_2 );
+	auto cresult1 = CCodeFactory::ConvertToCode(eCodeType, result1.destination);
+	EXPECT_THAT(cresult1.destination, StrEq(mbsAscii));
+	EXPECT_THAT(cresult1, IsTrue());
 
 	// Latin1はかな漢字変換非サポートなので、0x80以上の変換できる文字をチェックする
 	// 符号位置 81, 8D, 8F, 90, および 9D は未使用だが、そのまま出力される。
@@ -233,15 +360,13 @@ TEST(CCodeBase, codeLatin1)
 		"\xF0\xF1\xF2\xF3\xF4\xF5\xF6\xF7\xF8\xF9\xFA\xFB\xFC\xFD\xFE\xFF"
 		;
 
-	bool bComplete2_1 = false;
-	auto encoded2 = pCodeBase->CodeToUnicode(BinarySequenceView(reinterpret_cast<const std::byte*>(mbsLatin1ExtChars), int(std::size(mbsLatin1ExtChars))), &bComplete2_1);
-	ASSERT_STREQ(wcsLatin1ExtChars, encoded2.GetStringPtr());
-	ASSERT_TRUE(bComplete2_1);
+	auto result2 = CCodeFactory::LoadFromCode(eCodeType, mbsLatin1ExtChars);
+	EXPECT_THAT(result2.destination, StrEq(wcsLatin1ExtChars));
+	EXPECT_THAT(result2, IsTrue());
 
-	bool bComplete2_2 = false;
-	auto decoded2 = pCodeBase->UnicodeToCode(encoded2, &bComplete2_2);
-	ASSERT_EQ(0, memcmp(mbsLatin1ExtChars, decoded2.data(), decoded2.size()));
-	ASSERT_TRUE(bComplete2_2);
+	auto cresult2 = CCodeFactory::ConvertToCode(eCodeType, result2.destination);
+	EXPECT_THAT(cresult2.destination, StrEq(mbsLatin1ExtChars));
+	EXPECT_THAT(cresult2, IsTrue());
 
 	// Unicodeに変換できない文字はない（Latin1仕様）
 
@@ -249,10 +374,9 @@ TEST(CCodeBase, codeLatin1)
 	constexpr const auto& wcsKanaKanji = L"ｶﾅかなカナ漢字";
 	constexpr const auto& mbsKanaKanji = "????????";
 
-	bool bComplete4_2 = true;
-	auto decoded4 = pCodeBase->UnicodeToCode(wcsKanaKanji, &bComplete4_2);
-	ASSERT_EQ(0, memcmp(mbsKanaKanji, decoded4.data(), decoded4.size()));
-	ASSERT_FALSE(bComplete4_2);
+	const auto cresult4 = CCodeFactory::ConvertToCode(eCodeType, wcsKanaKanji);
+	EXPECT_THAT(cresult4.destination, StrEq(mbsKanaKanji));
+	EXPECT_THAT(cresult4, IsFalse());
 }
 
 /*!
@@ -267,29 +391,25 @@ TEST(CCodeBase, codeUtf8)
 	constexpr const auto& mbsAscii = "\x01\x02\x03\x04\x05\x06\a\b\t\n\v\f\r\x0E\x0F\x10\x11\x12\x13\x14\x15\x16\x17\x18\x19\x1A\x1B\x1C\x1D\x1E\x1F !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~\x7F";
 	constexpr const auto& wcsAscii = L"\x01\x02\x03\x04\x05\x06\a\b\t\n\v\f\r\x0E\x0F\x10\x11\x12\x13\x14\x15\x16\x17\x18\x19\x1A\x1B\x1C\x1D\x1E\x1F !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~\x7F";
 
-	bool bComplete1_1 = false;
-	auto encoded1 = pCodeBase->CodeToUnicode( BinarySequenceView( reinterpret_cast<const std::byte*>(mbsAscii), int(std::size(mbsAscii)) ), &bComplete1_1 );
-	EXPECT_STREQ( wcsAscii, encoded1.GetStringPtr() );
-	EXPECT_TRUE( bComplete1_1 );
+	auto result1 = CCodeFactory::LoadFromCode(eCodeType, mbsAscii);
+	EXPECT_THAT(result1.destination, StrEq(wcsAscii));
+	EXPECT_THAT(result1, IsTrue());
 
-	bool bComplete1_2 = false;
-	auto decoded1 = pCodeBase->UnicodeToCode( encoded1, &bComplete1_2 );
-	EXPECT_EQ( 0, memcmp( mbsAscii, decoded1.data(), decoded1.size() ) );
-	EXPECT_TRUE( bComplete1_2 );
+	auto cresult1 = CCodeFactory::ConvertToCode(eCodeType, result1.destination);
+	EXPECT_THAT(cresult1.destination, StrEq(mbsAscii));
+	EXPECT_THAT(cresult1, IsTrue());
 
 	// かな漢字の変換（UTF-8仕様）
-	constexpr const auto& wcsKanaKanji = L"ｶﾅかなカナ漢字";
 	constexpr const auto& mbsKanaKanji = u8"ｶﾅかなカナ漢字";
+	constexpr const auto& wcsKanaKanji = L"ｶﾅかなカナ漢字";
 
-	bool bComplete2_1 = false;
-	auto encoded2 = pCodeBase->CodeToUnicode( BinarySequenceView( reinterpret_cast<const std::byte*>(mbsKanaKanji), int(std::size(mbsKanaKanji)) ), &bComplete2_1 );
-	ASSERT_STREQ( wcsKanaKanji, encoded2.GetStringPtr() );
-	ASSERT_TRUE( bComplete2_1 );
+	auto result2 = CCodeFactory::LoadFromCode(eCodeType, (LPCSTR)mbsKanaKanji);
+	EXPECT_THAT(result2.destination, StrEq(wcsKanaKanji));
+	EXPECT_THAT(result2, IsTrue());
 
-	bool bComplete2_2 = false;
-	auto decoded2 = pCodeBase->UnicodeToCode( encoded2, &bComplete2_2 );
-	ASSERT_EQ( 0, memcmp( mbsKanaKanji, decoded2.data(), decoded2.size() ) );
-	ASSERT_TRUE( bComplete2_2 );
+	auto cresult2 = CCodeFactory::ConvertToCode(eCodeType, result2.destination);
+	EXPECT_THAT(cresult2.destination, StrEq((LPCSTR)mbsKanaKanji));
+	EXPECT_THAT(cresult2, IsTrue());
 }
 
 /*!
@@ -304,29 +424,25 @@ TEST(CCodeBase, codeUtf8_OracleImplementation)
 	constexpr const auto& mbsAscii = "\x01\x02\x03\x04\x05\x06\a\b\t\n\v\f\r\x0E\x0F\x10\x11\x12\x13\x14\x15\x16\x17\x18\x19\x1A\x1B\x1C\x1D\x1E\x1F !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~\x7F";
 	constexpr const auto& wcsAscii = L"\x01\x02\x03\x04\x05\x06\a\b\t\n\v\f\r\x0E\x0F\x10\x11\x12\x13\x14\x15\x16\x17\x18\x19\x1A\x1B\x1C\x1D\x1E\x1F !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~\x7F";
 
-	bool bComplete1_1 = false;
-	auto encoded1 = pCodeBase->CodeToUnicode( BinarySequenceView( reinterpret_cast<const std::byte*>(mbsAscii), int(std::size(mbsAscii)) ), &bComplete1_1 );
-	EXPECT_STREQ( wcsAscii, encoded1.GetStringPtr() );
-	EXPECT_TRUE( bComplete1_1 );
+	auto result1 = CCodeFactory::LoadFromCode(eCodeType, mbsAscii);
+	EXPECT_THAT(result1.destination, StrEq(wcsAscii));
+	EXPECT_THAT(result1, IsTrue());
 
-	bool bComplete1_2 = false;
-	auto decoded1 = pCodeBase->UnicodeToCode( encoded1, &bComplete1_2 );
-	EXPECT_EQ( 0, memcmp( mbsAscii, decoded1.data(), decoded1.size() ) );
-	EXPECT_TRUE( bComplete1_2 );
+	auto cresult1 = CCodeFactory::ConvertToCode(eCodeType, result1.destination);
+	EXPECT_THAT(cresult1.destination, StrEq(mbsAscii));
+	EXPECT_THAT(cresult1, IsTrue());
 
 	// かな漢字の変換（UTF-8仕様）
-	constexpr const auto& wcsKanaKanji = L"ｶﾅかなカナ漢字";
 	constexpr const auto& mbsKanaKanji = u8"ｶﾅかなカナ漢字";
+	constexpr const auto& wcsKanaKanji = L"ｶﾅかなカナ漢字";
 
-	bool bComplete2_1 = false;
-	auto encoded2 = pCodeBase->CodeToUnicode( BinarySequenceView( reinterpret_cast<const std::byte*>(mbsKanaKanji), int(std::size(mbsKanaKanji)) ), &bComplete2_1 );
-	ASSERT_STREQ( wcsKanaKanji, encoded2.GetStringPtr() );
-	ASSERT_TRUE( bComplete2_1 );
+	auto result2 = CCodeFactory::LoadFromCode(eCodeType, (LPCSTR)mbsKanaKanji);
+	EXPECT_THAT(result2.destination, StrEq(wcsKanaKanji));
+	EXPECT_THAT(result2, IsTrue());
 
-	bool bComplete2_2 = false;
-	auto decoded2 = pCodeBase->UnicodeToCode( encoded2, &bComplete2_2 );
-	ASSERT_EQ( 0, memcmp( mbsKanaKanji, decoded2.data(), decoded2.size() ) );
-	ASSERT_TRUE( bComplete2_2 );
+	auto cresult2 = CCodeFactory::ConvertToCode(eCodeType, result2.destination);
+	EXPECT_THAT(cresult2.destination, StrEq((LPCSTR)mbsKanaKanji));
+	EXPECT_THAT(cresult2, IsTrue());
 }
 
 /*!
@@ -335,49 +451,42 @@ TEST(CCodeBase, codeUtf8_OracleImplementation)
 TEST(CCodeBase, codeUtf7)
 {
 	const auto eCodeType = CODE_UTF7;
-	auto pCodeBase = CCodeFactory::CreateCodeBase(eCodeType);
 
 	// 7bit ASCII範囲（UTF-7仕様）
 	constexpr const auto& mbsAscii = "+AAEAAgADAAQABQAGAAcACA-\t\n+AAsADA-\r+AA4ADwAQABEAEgATABQAFQAWABcAGAAZABoAGwAcAB0AHgAf- +ACEAIgAjACQAJQAm-'()+ACoAKw-,-./0123456789:+ADsAPAA9AD4-?+AEA-ABCDEFGHIJKLMNOPQRSTUVWXYZ+AFsAXABdAF4AXwBg-abcdefghijklmnopqrstuvwxyz+AHsAfAB9AH4Afw-";
 	constexpr const auto& wcsAscii = L"\x01\x02\x03\x04\x05\x06\a\b\t\n\v\f\r\x0E\x0F\x10\x11\x12\x13\x14\x15\x16\x17\x18\x19\x1A\x1B\x1C\x1D\x1E\x1F !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~\x7F";
 
-	bool bComplete1_1 = false;
-	auto encoded1 = pCodeBase->CodeToUnicode(BinarySequenceView(reinterpret_cast<const std::byte*>(mbsAscii), int(std::size(mbsAscii))), &bComplete1_1);
-	EXPECT_STREQ(wcsAscii, encoded1.GetStringPtr());
-	EXPECT_TRUE(bComplete1_1);
+	auto result1 = CCodeFactory::LoadFromCode(eCodeType, mbsAscii);
+	EXPECT_THAT(result1.destination, StrEq(wcsAscii));
+	EXPECT_THAT(result1, IsTrue());
 
-	bool bComplete1_2 = false;
-	auto decoded1 = pCodeBase->UnicodeToCode(encoded1, &bComplete1_2);
-	EXPECT_EQ(0, memcmp(mbsAscii, decoded1.data(), decoded1.size()));
-	EXPECT_TRUE(bComplete1_2);
+	auto cresult1 = CCodeFactory::ConvertToCode(eCodeType, result1.destination);
+	EXPECT_THAT(cresult1.destination, StrEq(mbsAscii));
+	EXPECT_THAT(cresult1, IsTrue());
 
 	// かな漢字の変換（UTF-7仕様）
 	constexpr const auto& wcsKanaKanji = L"ｶﾅかなカナ漢字";
 	constexpr const auto& mbsKanaKanji = "+/3b/hTBLMGowqzDKbyJbVw-";
 
-	bool bComplete2_1 = false;
-	auto encoded2 = pCodeBase->CodeToUnicode(BinarySequenceView(reinterpret_cast<const std::byte*>(mbsKanaKanji), int(std::size(mbsKanaKanji))), &bComplete2_1);
-	ASSERT_STREQ(wcsKanaKanji, encoded2.GetStringPtr());
-	ASSERT_TRUE(bComplete2_1);
+	auto result2 = CCodeFactory::LoadFromCode(eCodeType, mbsKanaKanji);
+	EXPECT_THAT(result2.destination, StrEq(wcsKanaKanji));
+	EXPECT_THAT(result2, IsTrue());
 
-	bool bComplete2_2 = false;
-	auto decoded2 = pCodeBase->UnicodeToCode(encoded2, &bComplete2_2);
-	ASSERT_EQ(0, memcmp(mbsKanaKanji, decoded2.data(), decoded2.size()));
-	ASSERT_TRUE(bComplete2_2);
+	auto cresult2 = CCodeFactory::ConvertToCode(eCodeType, result2.destination);
+	EXPECT_THAT(cresult2.destination, StrEq(mbsKanaKanji));
+	EXPECT_THAT(cresult2, IsTrue());
 
 	// UTF-7仕様
 	constexpr const auto& wcsPlusPlus = L"C++";
 	constexpr const auto& mbsPlusPlus = "C+-+-";
 
-	bool bComplete5_1 = false;
-	auto encoded5 = pCodeBase->CodeToUnicode(BinarySequenceView(reinterpret_cast<const std::byte*>(mbsPlusPlus), int(std::size(mbsPlusPlus))), &bComplete5_1);
-	ASSERT_STREQ(wcsPlusPlus, encoded5.GetStringPtr());
-	ASSERT_TRUE(bComplete5_1);
+	auto result5 = CCodeFactory::LoadFromCode(eCodeType, mbsPlusPlus);
+	EXPECT_THAT(result5.destination, StrEq(wcsPlusPlus));
+	EXPECT_THAT(result5, IsTrue());
 
-	bool bComplete5_2 = false;
-	auto decoded5 = pCodeBase->UnicodeToCode(encoded5, &bComplete5_2);
-	ASSERT_EQ(0, memcmp(mbsPlusPlus, decoded5.data(), decoded5.size()));
-	ASSERT_TRUE(bComplete5_2);
+	auto cresult5 = CCodeFactory::ConvertToCode(eCodeType, result5.destination);
+	EXPECT_THAT(cresult5.destination, StrEq(mbsPlusPlus));
+	EXPECT_THAT(cresult5, IsTrue());
 }
 
 /*!
@@ -386,46 +495,31 @@ TEST(CCodeBase, codeUtf7)
 TEST(CCodeBase, codeUtf16Le)
 {
 	const auto eCodeType = CODE_UTF16LE;
-	auto pCodeBase = CCodeFactory::CreateCodeBase( eCodeType );
 
 	// 7bit ASCII範囲（等価変換）
 	constexpr auto& mbsAscii = "\x01\x02\x03\x04\x05\x06\a\b\t\n\v\f\r\x0E\x0F\x10\x11\x12\x13\x14\x15\x16\x17\x18\x19\x1A\x1B\x1C\x1D\x1E\x1F !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~\x7F";
 	constexpr auto& wcsAscii = L"\x01\x02\x03\x04\x05\x06\a\b\t\n\v\f\r\x0E\x0F\x10\x11\x12\x13\x14\x15\x16\x17\x18\x19\x1A\x1B\x1C\x1D\x1E\x1F !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~\x7F";
 
-	// リトルエンディアンのバイナリを作成
-	std::basic_string<uint16_t> bin;
-	for( const auto ch : mbsAscii ){
-		bin.append( 1, ch );
-	}
+	const auto bytesAscii = ToUtf16LeBytes(mbsAscii);
+	auto result1 = CCodeFactory::LoadFromCode(eCodeType, bytesAscii);
+	EXPECT_THAT(result1.destination, StrEq(wcsAscii));
+	EXPECT_THAT(result1, IsTrue());
 
-	bool bComplete1_1 = false;
-	auto encoded1 = pCodeBase->CodeToUnicode( BinarySequenceView( reinterpret_cast<const std::byte*>(bin.data()), bin.size() * sizeof(decltype(bin)::value_type) ), &bComplete1_1 );
-	ASSERT_STREQ( wcsAscii, encoded1.GetStringPtr() );
-	ASSERT_TRUE( bComplete1_1 );
-
-	bool bComplete1_2 = false;
-	auto decoded1 = pCodeBase->UnicodeToCode( encoded1, &bComplete1_2 );
-	ASSERT_EQ( 0, memcmp( bin.data(), decoded1.data(), decoded1.size() ) );
-	ASSERT_TRUE( bComplete1_2 );
+	auto cresult1 = CCodeFactory::ConvertToCode(eCodeType, result1.destination);
+	EXPECT_THAT(cresult1.destination, StrEq(bytesAscii));
+	EXPECT_THAT(cresult1, IsTrue());
 
 	// かな漢字の変換（UTF-16LE仕様）
 	constexpr const auto& wcsKanaKanji = L"ｶﾅかなカナ漢字";
 
-	// リトルエンディアンのバイナリを作成
-	bin.clear();
-	for( const auto ch : wcsKanaKanji ){
-		bin.append( 1, ch );
-	}
+	const auto bytesKanaKanji = ToUtf16LeBytes(wcsKanaKanji);
+	auto result2 = CCodeFactory::LoadFromCode(eCodeType, bytesKanaKanji);
+	EXPECT_THAT(result2.destination, StrEq(wcsKanaKanji));
+	EXPECT_THAT(result2, IsTrue());
 
-	bool bComplete2_1 = false;
-	auto encoded2 = pCodeBase->CodeToUnicode( BinarySequenceView( reinterpret_cast<const std::byte*>(bin.data()), bin.size() * sizeof(decltype(bin)::value_type) ), &bComplete2_1 );
-	ASSERT_STREQ( wcsKanaKanji, encoded2.GetStringPtr() );
-	ASSERT_TRUE( bComplete2_1 );
-
-	bool bComplete2_2 = false;
-	auto decoded2 = pCodeBase->UnicodeToCode( encoded2, &bComplete2_2 );
-	ASSERT_EQ( 0, memcmp( bin.data(), decoded2.data(), decoded2.size() ) );
-	ASSERT_TRUE( bComplete2_2 );
+	auto cresult2 = CCodeFactory::ConvertToCode(eCodeType, result2.destination);
+	EXPECT_THAT(cresult2.destination, StrEq(bytesKanaKanji));
+	EXPECT_THAT(cresult2, IsTrue());
 }
 
 /*!
@@ -434,46 +528,31 @@ TEST(CCodeBase, codeUtf16Le)
 TEST(CCodeBase, codeUtf16Be)
 {
 	const auto eCodeType = CODE_UTF16BE;
-	auto pCodeBase = CCodeFactory::CreateCodeBase( eCodeType );
 
 	// 7bit ASCII範囲（等価変換）
 	constexpr auto& mbsAscii = "\x01\x02\x03\x04\x05\x06\a\b\t\n\v\f\r\x0E\x0F\x10\x11\x12\x13\x14\x15\x16\x17\x18\x19\x1A\x1B\x1C\x1D\x1E\x1F !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~\x7F";
 	constexpr auto& wcsAscii = L"\x01\x02\x03\x04\x05\x06\a\b\t\n\v\f\r\x0E\x0F\x10\x11\x12\x13\x14\x15\x16\x17\x18\x19\x1A\x1B\x1C\x1D\x1E\x1F !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~\x7F";
 
-	// ビッグエンディアンのバイナリを作成
-	std::basic_string<uint16_t> bin;
-	for( const auto ch : mbsAscii ){
-		bin.append( 1, ::_byteswap_ushort( ch ) );
-	}
+	const auto bytesAscii = ToUtf16BeBytes(mbsAscii);
+	auto result1 = CCodeFactory::LoadFromCode(eCodeType, bytesAscii);
+	EXPECT_THAT(result1.destination, StrEq(wcsAscii));
+	EXPECT_THAT(result1, IsTrue());
 
-	bool bComplete1_1 = false;
-	auto encoded = pCodeBase->CodeToUnicode( BinarySequenceView( reinterpret_cast<const std::byte*>(bin.data()), bin.size() * sizeof(decltype(bin)::value_type)), &bComplete1_1 );
-	ASSERT_STREQ( wcsAscii, encoded.GetStringPtr() );
-	ASSERT_TRUE( bComplete1_1 );
-
-	bool bComplete1_2 = false;
-	auto decoded = pCodeBase->UnicodeToCode( encoded, &bComplete1_2 );
-	ASSERT_EQ( 0, memcmp( bin.data(), decoded.data(), decoded.size() ) );
-	ASSERT_TRUE( bComplete1_2 );
+	auto cresult1 = CCodeFactory::ConvertToCode(eCodeType, result1.destination);
+	EXPECT_THAT(cresult1.destination, StrEq(bytesAscii));
+	EXPECT_THAT(cresult1, IsTrue());
 
 	// かな漢字の変換（UTF-16BE仕様）
 	constexpr const auto& wcsKanaKanji = L"ｶﾅかなカナ漢字";
 
-	// ビッグエンディアンのバイナリを作成
-	bin.clear();
-	for( const auto ch : wcsKanaKanji ){
-		bin.append( 1, ::_byteswap_ushort( ch ) );
-	}
+	const auto bytesKanaKanji = ToUtf16BeBytes(wcsKanaKanji);
+	auto result2 = CCodeFactory::LoadFromCode(eCodeType, bytesKanaKanji);
+	EXPECT_THAT(result2.destination, StrEq(wcsKanaKanji));
+	EXPECT_THAT(result2, IsTrue());
 
-	bool bComplete2_1 = false;
-	auto encoded2 = pCodeBase->CodeToUnicode( BinarySequenceView( reinterpret_cast<const std::byte*>(bin.data()), bin.size() * sizeof(decltype(bin)::value_type) ), &bComplete2_1 );
-	ASSERT_STREQ( wcsKanaKanji, encoded2.GetStringPtr() );
-	ASSERT_TRUE( bComplete2_1 );
-
-	bool bComplete2_2 = false;
-	auto decoded2 = pCodeBase->UnicodeToCode( encoded2, &bComplete2_2 );
-	ASSERT_EQ( 0, memcmp( bin.data(), decoded2.data(), decoded2.size() ) );
-	ASSERT_TRUE( bComplete2_2 );
+	auto cresult2 = CCodeFactory::ConvertToCode(eCodeType, result2.destination);
+	EXPECT_THAT(cresult2.destination, StrEq(bytesKanaKanji));
+	EXPECT_THAT(cresult2, IsTrue());
 }
 
 /*!
@@ -482,46 +561,31 @@ TEST(CCodeBase, codeUtf16Be)
 TEST(CCodeBase, codeUtf32Le)
 {
 	const auto eCodeType = CODE_UTF32LE;
-	auto pCodeBase = CCodeFactory::CreateCodeBase( eCodeType );
 
 	// 7bit ASCII範囲（等価変換）
 	constexpr auto& mbsAscii = "\x01\x02\x03\x04\x05\x06\a\b\t\n\v\f\r\x0E\x0F\x10\x11\x12\x13\x14\x15\x16\x17\x18\x19\x1A\x1B\x1C\x1D\x1E\x1F !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~\x7F";
 	constexpr auto& wcsAscii = L"\x01\x02\x03\x04\x05\x06\a\b\t\n\v\f\r\x0E\x0F\x10\x11\x12\x13\x14\x15\x16\x17\x18\x19\x1A\x1B\x1C\x1D\x1E\x1F !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~\x7F";
 
-	// リトルエンディアンのバイナリを作成
-	std::basic_string<uint32_t> bin;
-	for( const auto ch : mbsAscii ){
-		bin.append( 1, ch );
-	}
+	const auto bytesAscii = ToUtf32LeBytes(mbsAscii);
+	auto result1 = CCodeFactory::LoadFromCode(eCodeType, bytesAscii);
+	EXPECT_THAT(result1.destination, StrEq(wcsAscii));
+	EXPECT_THAT(result1, IsTrue());
 
-	bool bComplete1_1 = false;
-	auto encoded = pCodeBase->CodeToUnicode( BinarySequenceView( reinterpret_cast<const std::byte*>(bin.data()), bin.size() * sizeof(decltype(bin)::value_type)), &bComplete1_1 );
-	ASSERT_STREQ( wcsAscii, encoded.GetStringPtr() );
-	ASSERT_TRUE( bComplete1_1 );
-
-	bool bComplete1_2 = false;
-	auto decoded = pCodeBase->UnicodeToCode( encoded, &bComplete1_2 );
-	ASSERT_EQ( 0, memcmp( bin.data(), decoded.data(), decoded.size() ) );
-	ASSERT_TRUE( bComplete1_2 );
+	auto cresult1 = CCodeFactory::ConvertToCode(eCodeType, result1.destination);
+	EXPECT_THAT(cresult1.destination, StrEq(bytesAscii));
+	EXPECT_THAT(cresult1, IsTrue());
 
 	// かな漢字の変換（UTF-32LE仕様）
 	constexpr const auto& wcsKanaKanji = L"ｶﾅかなカナ漢字";
 
-	// リトルエンディアンのバイナリを作成
-	bin.clear();
-	for( const auto ch : wcsKanaKanji ){
-		bin.append( 1, ch );
-	}
+	const auto bytesKanaKanji = ToUtf32LeBytes(wcsKanaKanji);
+	auto result2 = CCodeFactory::LoadFromCode(eCodeType, bytesKanaKanji);
+	EXPECT_THAT(result2.destination, StrEq(wcsKanaKanji));
+	EXPECT_THAT(result2, IsTrue());
 
-	bool bComplete2_1 = false;
-	auto encoded2 = pCodeBase->CodeToUnicode( BinarySequenceView( reinterpret_cast<const std::byte*>(bin.data()), bin.size() * sizeof(decltype(bin)::value_type) ), &bComplete2_1 );
-	ASSERT_STREQ( wcsKanaKanji, encoded2.GetStringPtr() );
-	ASSERT_TRUE( bComplete2_1 );
-
-	bool bComplete2_2 = false;
-	auto decoded2 = pCodeBase->UnicodeToCode( encoded2, &bComplete2_2 );
-	ASSERT_EQ( 0, memcmp( bin.data(), decoded2.data(), decoded2.size() ) );
-	ASSERT_TRUE( bComplete2_2 );
+	auto cresult2 = CCodeFactory::ConvertToCode(eCodeType, result2.destination);
+	EXPECT_THAT(cresult2.destination, StrEq(bytesKanaKanji));
+	EXPECT_THAT(cresult2, IsTrue());
 }
 
 /*!
@@ -530,46 +594,31 @@ TEST(CCodeBase, codeUtf32Le)
 TEST(CCodeBase, codeUtf32Be)
 {
 	const auto eCodeType = CODE_UTF32BE;
-	auto pCodeBase = CCodeFactory::CreateCodeBase( eCodeType );
 
 	// 7bit ASCII範囲（等価変換）
 	constexpr auto& mbsAscii = "\x01\x02\x03\x04\x05\x06\a\b\t\n\v\f\r\x0E\x0F\x10\x11\x12\x13\x14\x15\x16\x17\x18\x19\x1A\x1B\x1C\x1D\x1E\x1F !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~\x7F";
 	constexpr auto& wcsAscii = L"\x01\x02\x03\x04\x05\x06\a\b\t\n\v\f\r\x0E\x0F\x10\x11\x12\x13\x14\x15\x16\x17\x18\x19\x1A\x1B\x1C\x1D\x1E\x1F !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~\x7F";
 
-	// ビッグエンディアンのバイナリを作成
-	std::basic_string<uint32_t> bin;
-	for( const auto ch : mbsAscii ){
-		bin.append( 1, ::_byteswap_ulong( ch ) );
-	}
+	const auto bytesAscii = ToUtf32BeBytes(mbsAscii);
+	auto result1 = CCodeFactory::LoadFromCode(eCodeType, bytesAscii);
+	EXPECT_THAT(result1.destination, StrEq(wcsAscii));
+	EXPECT_THAT(result1, IsTrue());
 
-	bool bComplete1_1 = false;
-	auto encoded = pCodeBase->CodeToUnicode( BinarySequenceView( reinterpret_cast<const std::byte*>(bin.data()), bin.size() * sizeof(decltype(bin)::value_type)), &bComplete1_1 );
-	ASSERT_STREQ( wcsAscii, encoded.GetStringPtr() );
-	ASSERT_TRUE( bComplete1_1 );
-
-	bool bComplete1_2 = false;
-	auto decoded = pCodeBase->UnicodeToCode( encoded, &bComplete1_2 );
-	ASSERT_EQ( 0, memcmp( bin.data(), decoded.data(), decoded.size() ) );
-	ASSERT_TRUE( bComplete1_2 );
+	auto cresult1 = CCodeFactory::ConvertToCode(eCodeType, result1.destination);
+	EXPECT_THAT(cresult1.destination, StrEq(bytesAscii));
+	EXPECT_THAT(cresult1, IsTrue());
 
 	// かな漢字の変換（UTF-32BE仕様）
 	constexpr const auto& wcsKanaKanji = L"ｶﾅかなカナ漢字";
 
-	// ビッグエンディアンのバイナリを作成
-	bin.clear();
-	for( const auto ch : wcsKanaKanji ){
-		bin.append( 1, ::_byteswap_ulong( ch ) );
-	}
+	const auto bytesKanaKanji = ToUtf32BeBytes(wcsKanaKanji);
+	auto result2 = CCodeFactory::LoadFromCode(eCodeType, bytesKanaKanji);
+	EXPECT_THAT(result2.destination, StrEq(wcsKanaKanji));
+	EXPECT_THAT(result2, IsTrue());
 
-	bool bComplete2_1 = false;
-	auto encoded2 = pCodeBase->CodeToUnicode( BinarySequenceView( reinterpret_cast<const std::byte*>(bin.data()), bin.size() * sizeof(decltype(bin)::value_type) ), &bComplete2_1 );
-	ASSERT_STREQ( wcsKanaKanji, encoded2.GetStringPtr() );
-	ASSERT_TRUE( bComplete2_1 );
-
-	bool bComplete2_2 = false;
-	auto decoded2 = pCodeBase->UnicodeToCode( encoded2, &bComplete2_2 );
-	ASSERT_EQ( 0, memcmp( bin.data(), decoded2.data(), decoded2.size() ) );
-	ASSERT_TRUE( bComplete2_2 );
+	auto cresult2 = CCodeFactory::ConvertToCode(eCodeType, result2.destination);
+	EXPECT_THAT(cresult2.destination, StrEq(bytesKanaKanji));
+	EXPECT_THAT(cresult2, IsTrue());
 }
 
 //! EOLテストのためのフィクスチャクラス
