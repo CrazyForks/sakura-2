@@ -154,6 +154,9 @@
     <ClCompile Include="..\src\test\resources\printECodeType.cpp">
       <Filter>Other Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\src\test\resources\printEEolType.cpp">
+      <Filter>Other Files</Filter>
+    </ClCompile>
     <ClCompile Include="..\src\test\resources\printEFunctionCode.cpp">
       <Filter>Other Files</Filter>
     </ClCompile>
