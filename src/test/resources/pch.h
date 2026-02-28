@@ -33,3 +33,9 @@ using ::testing::StrNe;
 
 //! googletestに機能IDを出力させる
 void PrintTo(EFunctionCode eFuncCode, std::ostream* os);
+
+//! googletestに文字コードセット種別を出力させる
+void PrintTo(ECodeType eCodeType, std::ostream* os);
+
+//! googletestに行終端子を出力させる 
+void PrintTo(EEolType eEolType, std::ostream* os);

@@ -160,6 +160,7 @@
     <ClCompile Include="..\src\test\cpp\tests1\test-mydevmode.cpp" />
     <ClCompile Include="..\src\test\cpp\tests1\test-parameterized.cpp" />
     <ClCompile Include="..\src\test\resources\printECodeType.cpp" />
+    <ClCompile Include="..\src\test\resources\printEEolType.cpp" />
     <ClCompile Include="..\src\test\cpp\tests1\test-sample-disabled.cpp" />
     <ClCompile Include="..\src\test\cpp\tests1\test-sample.cpp" />
     <ClCompile Include="..\src\test\cpp\tests1\test-ssearchoption.cpp" />
